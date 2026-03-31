@@ -1,0 +1,102 @@
+# Byte-code files
+*.pyc
+__pycache__/
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables and secrets
+.venv
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Database files
+*.sqlite3
+*.db
+*.db-*
+*.sql
+*.log
+/data/  # If you have a local data directory for DBs or ChromaDB
+
+# FastAPI / Uvicorn specific
+.uvicorn_reload_history
+
+# Python specific
+*.py[cod]
+*$py.class
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# IDE-specific files
+.idea/                  # PyCharm
+.vscode/                # VS Code
+*.iml                   # IntelliJ IDEA (for Python projects)
+.DS_Store               # macOS
+.Trash                  # macOS
+Thumbs.db               # Windows
+ehthumbs.db             # Windows
+*.sublime-project       # Sublime Text
+*.sublime-workspace     # Sublime Text
+*.swp                   # Vim swap files
+
+# OS generated files
+.DS_Store
+.localized
+.Trashes
+Icon?
+
+# Temporary files and directories
+tmp/
+temp/
+*.tmp
+*.log
+*.bak
+*.swp
+*~
+# Temporary files created during PDF processing
+*.pdf.tmp
+*.pdf.bak
+*.pdf.extracted_text
+
+# ChromaDB specific (if using persistent client in a local directory)
+chroma_db/
+.chroma/
+
+# Testing related
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+*.gz
+*.tgz
+
+# Compiled languages (if any native extensions)
+*.so
+*.dll
+*.dylib
+
+# Docker related
+Dockerfile.bak
+docker-compose.bak
+.dockerignore.bak
