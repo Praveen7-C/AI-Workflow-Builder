@@ -1,14 +1,15 @@
 # AI Workflow Builder
 
-A No-Code/Low-Code platform for building intelligent AI workflows visually.
+A no-code/low-code platform for building intelligent AI workflows visually — powered by FastAPI, React, Google Gemini, ChromaDB, and Supabase.
 
+---
 
-## Overview of this Project
+## Overview
 
-This project is a full-stack platform that lets you visually design AI pipelines as directed node graphs and interact with them through a built-in chat interface. Each pipeline — called a **Stack** — is a sequence of typed nodes that you wire together on a drag-and-drop canvas:
+AI Workflow Builder lets you design AI pipelines as directed node graphs and interact with them through a built-in chat interface. Each pipeline — called a **Stack** — is a sequence of typed nodes you wire together on a drag-and-drop canvas:
 
 - A **User Query** node captures the user's input
-- A **Knowledge Base** node retrieves relevant context from your uploaded PDF documents using vector similarity search (RAG)
+- A **Knowledge Base** node retrieves relevant context from uploaded PDF documents using vector similarity search (RAG)
 - A **Web Search** node fetches real-time information from Google via SerpAPI
 - An **LLM Engine** node generates the final answer using Google Gemini
 - An **Output** node returns the formatted response to the chat interface
@@ -44,19 +45,20 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 - Optional real-time web search grounding via SerpAPI (falls back to Wikipedia when no key is configured)
 
 ### Authentication
-- Custom JWT-based auth — **zero third-party auth libraries**, Python stdlib only
+- Custom JWT-based auth built on Python stdlib only — zero third-party auth libraries
 - PBKDF2-HMAC-SHA256 with 260,000 iterations and a random 16-byte salt per user (NIST SP 800-132 compliant)
 - Constant-time password comparison via `hmac.compare_digest` — prevents timing attacks
 - 7-day token expiry with localStorage persistence on the client
+- Google OAuth 2.0 support with avatar and display name sync
 
 ### Security
-- All user API keys (Gemini, SerpAPI) encrypted at rest with **Fernet** (AES-128-CBC + HMAC-SHA256) before being written to the database
+- All user API keys (Gemini, SerpAPI) encrypted at rest with Fernet (AES-128-CBC + HMAC-SHA256) before being written to the database
 - Per-user data isolation — every workflow endpoint verifies ownership against the authenticated JWT claim
 - Ghost-edge filtering prevents execution crashes when workflows are modified after previous runs
 - Cycle detection in the execution engine prevents infinite loops
 
 ### Chat Interface
-- Persistent conversation history stored in SQLite, scoped per workflow
+- Persistent conversation history stored in the database, scoped per workflow
 - Full history restored automatically when the chat dialog opens
 - Last 10 messages sent as multi-turn context on each request
 - Expandable source citation cards per assistant message
@@ -68,9 +70,9 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 ### Backend
 
 | Layer | Technology |
-|-------|-----------|
+|-------|------------|
 | Framework | FastAPI + Uvicorn |
-| Database | SQLite (WAL mode, FK enforcement) |
+| Database | SQLite (WAL mode) + Supabase (PostgreSQL) |
 | Vector Store | ChromaDB (persistent, embedded) |
 | LLM | Google Gemini API (`google-genai`) |
 | Embedding | Gemini `embedding-001` + `all-MiniLM-L6-v2` |
@@ -78,12 +80,12 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 | PDF Parsing | PyMuPDF (`fitz`) |
 | Encryption | `cryptography` — Fernet |
 | HTTP Client | `httpx` |
-| Auth | Python stdlib only (`hashlib`, `hmac`, `base64`) |
+| Auth | Python stdlib (`hashlib`, `hmac`, `base64`) + python-jose |
 
 ### Frontend
 
 | Layer | Technology |
-|-------|-----------|
+|-------|------------|
 | Framework | React 18 + TypeScript + Vite |
 | Canvas | React Flow (`@xyflow/react`) |
 | Global State | Zustand |
@@ -101,10 +103,10 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 .
 ├── Backend/
 │   ├── main.py                        # FastAPI app, router registration, DB init on startup
-│   ├── app.db                         # SQLite database — auto-created on first run
 │   ├── requirements.txt
 │   ├── schema.sql                     # Reference schema (Postgres/Supabase variant)
-│   ├── .env                           # Environment variables (see setup below)
+│   ├── supabase_migration.sql         # Supabase migration script
+│   ├── .env                           # Environment variables (see Setup below)
 │   │
 │   ├── api/
 │   │   ├── models/
@@ -116,7 +118,8 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 │   │       └── kb.py                  # POST /kb/upload  GET /kb/documents
 │   │
 │   ├── db/
-│   │   └── database.py                # SQLite connection manager + all CRUD helpers
+│   │   ├── database.py                # SQLite connection manager + all CRUD helpers
+│   │   └── supabase.py                # Supabase client initialization
 │   │
 │   ├── services/
 │   │   ├── workflow_orchestrator.py   # Graph traversal execution engine
@@ -157,6 +160,8 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
         │   ├── Auth.tsx               # Sign-in / sign-up page
         │   ├── Homepage.tsx           # Animated landing page
         │   ├── StacksPage.tsx         # Workflow grid with CRUD actions
+        │   ├── ProfilePage.tsx        # Edit display name and avatar
+        │   ├── AvatarGeneratorPage.tsx
         │   └── BuilderPage.tsx        # Canvas host page
         │
         └── components/
@@ -181,13 +186,15 @@ Once built, every Stack becomes a persistent chatbot with full conversation hist
 
 ### Prerequisites
 
-| Requirement | Version |
-|-------------|---------|
+| Requirement | Version / Notes |
+|-------------|-----------------|
 | Python | 3.10+ |
 | Node.js | 18+ |
 | npm | 9+ |
+| Supabase account | [supabase.com](https://supabase.com) — free tier works |
 | Google Gemini API Key | [Get one here](https://aistudio.google.com/app/apikey) |
-| SerpAPI Key | [Get one here](https://serpapi.com) — falls back to Wikipedia if absent |
+| SerpAPI Key | [Get one here](https://serpapi.com) — optional, falls back to Wikipedia |
+| Google Cloud project | Required only if using Google OAuth |
 
 ---
 
@@ -209,8 +216,9 @@ source venv/bin/activate
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Create your environment file and fill in the required values
+# 4. Create your environment file
 cp .env.example .env
+# Then fill in the required values (see Environment Variables below)
 
 # 5. Start the development server
 uvicorn main:app --reload
@@ -218,9 +226,7 @@ uvicorn main:app --reload
 
 The API will be available at `http://localhost:8000`
 
-Interactive Swagger UI docs at `http://localhost:8000/docs`
-
-> The SQLite database (`app.db`) and ChromaDB directory (`chroma_db/`) are created automatically on first run — no migration step needed.
+Interactive Swagger docs are available at `http://localhost:8000/docs`
 
 ---
 
@@ -235,6 +241,7 @@ npm install
 
 # 3. Create your environment file
 cp .env.example .env
+# Set VITE_BACKEND_URL=http://localhost:8000
 
 # 4. Start the development server
 npm run dev
@@ -259,9 +266,22 @@ JWT_SECRET=your_jwt_secret_here
 
 # OPTIONAL — ChromaDB storage path. Default: ./chroma_db
 CHROMA_PERSIST_DIR=./chroma_db
+
+# Supabase (required if using Supabase auth/storage)
+SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
+SUPABASE_KEY=eyJhbGci...
+SUPABASE_SERVICE_KEY=eyJhbGci...
+
+# Google OAuth (required only if using Google Sign-In)
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxx
+
+# URLs
+FRONTEND_URL=http://localhost:5173
+BACKEND_URL=http://localhost:8000
 ```
 
-> **Note:** Gemini and SerpAPI keys are entered per-workflow inside the node configuration UI. They are encrypted with Fernet before being stored in the database — you do not need to set them globally here.
+> **Note:** Gemini and SerpAPI keys are entered per-workflow inside the node configuration UI. They are encrypted with Fernet before being stored in the database — you do not set them globally here.
 
 ---
 
@@ -347,19 +367,6 @@ The update endpoint accepts `multipart/form-data` with fields: `name`, `descript
 }
 ```
 
-**Execute response:**
-```json
-{
-  "workflow_response": {
-    "final_response": "According to section 3 of the document, pricing starts at..."
-  },
-  "chat_history": [
-    { "role": "user", "message": "What does the document say about pricing?", "timestamp": "2024-01-01T12:00:00" },
-    { "role": "bot", "message": "According to section 3...", "timestamp": "2024-01-01T12:00:01" }
-  ]
-}
-```
-
 ---
 
 ### Knowledge Base
@@ -377,17 +384,17 @@ The update endpoint accepts `multipart/form-data` with fields: `name`, `descript
 
 When a chat message is sent, the `WorkflowOrchestrator` on the backend:
 
-1. **Loads** the workflow graph from SQLite and decrypts API keys in memory only — keys are never logged or persisted in plaintext
-2. **Filters ghost edges** — edges pointing to nodes that no longer exist are silently skipped to prevent runtime crashes
-3. **Traverses** the directed graph starting from `UserQueryNode`, executing each node in sequence
-4. **Propagates** data between nodes based on the `targetHandle` of each connecting edge (`query`, `context`, `target`)
-5. **Detects cycles** — a visited set prevents infinite loops
-6. **Returns** the `OutputNode`'s `final_response` to the caller
+1. Loads the workflow graph from the database and decrypts API keys in memory only — keys are never logged or persisted in plaintext
+2. Filters ghost edges — edges pointing to nodes that no longer exist are silently skipped
+3. Traverses the directed graph starting from `UserQueryNode`, executing each node in sequence
+4. Propagates data between nodes based on the `targetHandle` of each connecting edge (`query`, `context`, `target`)
+5. Detects cycles using a visited set to prevent infinite loops
+6. Returns the `OutputNode`'s `final_response` to the caller
 
 ```
-UserQueryNode ──(query)──► KnowledgeBaseNode ──(context)──► LLMNode ──(answer)──► OutputNode
-                                                                ▲
-                                            WebSearchNode ──(results)──┘
+UserQueryNode --(query)--> KnowledgeBaseNode --(context)--> LLMNode --(answer)--> OutputNode
+                                                                ^
+                                            WebSearchNode --(results)--+
 ```
 
 ---
@@ -395,25 +402,23 @@ UserQueryNode ──(query)──► KnowledgeBaseNode ──(context)──► 
 ### RAG Pipeline (Knowledge Base Node)
 
 **At upload time:**
-
 ```
 PDF File
-  └─► PyMuPDF text extraction
-        └─► Split into 1,000-char chunks (200-char overlap)
-              └─► For each chunk:
-                    ├─► [Level 1] Ensemble — average(Gemini 384-dim, ST 384-dim), L2-normalized
-                    ├─► [Level 2] Sentence Transformers only — all-MiniLM-L6-v2
-                    └─► [Level 3] Gemini only — gemini-embedding-001, dim=384
-                          └─► ChromaDB — store vector + metadata (workflow_id, doc_name, chunk_index)
+  --> PyMuPDF text extraction
+        --> Split into 1,000-char chunks (200-char overlap)
+              --> For each chunk:
+                    [Level 1] Ensemble: average(Gemini 384-dim, ST 384-dim), L2-normalized
+                    [Level 2] Sentence Transformers only: all-MiniLM-L6-v2
+                    [Level 3] Gemini only: gemini-embedding-001, dim=384
+                          --> ChromaDB: store vector + metadata (workflow_id, doc_name, chunk_index)
 ```
 
 **At query time:**
-
 ```
 User query
-  └─► Embed with same strategy used at upload (read from chunk metadata)
-        └─► ChromaDB cosine similarity search — top 5 chunks, filtered by workflow_id
-              └─► Return as numbered context blocks → fed into LLM node
+  --> Embed with same strategy used at upload
+        --> ChromaDB cosine similarity search: top 5 chunks, filtered by workflow_id
+              --> Return as numbered context blocks fed into LLM node
 ```
 
 ---
@@ -421,17 +426,17 @@ User query
 ### Authentication Flow
 
 ```
-Sign Up ──► PBKDF2-HMAC-SHA256 (260,000 iterations, random 16-byte salt)
-              └─► Store salted hash in SQLite users table
+Sign Up --> PBKDF2-HMAC-SHA256 (260,000 iterations, random 16-byte salt)
+              --> Store salted hash in database
 
-Sign In ──► Re-derive hash with stored salt
-              └─► hmac.compare_digest (constant-time, prevents timing attacks)
-                    └─► Issue HS256 JWT { sub, email, iat, exp = 7 days }
+Sign In --> Re-derive hash with stored salt
+              --> hmac.compare_digest (constant-time, prevents timing attacks)
+                    --> Issue HS256 JWT { sub, email, iat, exp = 7 days }
 
-API Request ──► Authorization: Bearer <token>
-                  └─► Verify HMAC-SHA256 signature
-                        └─► Check exp timestamp
-                              └─► Extract user_id from sub claim
+API Request --> Authorization: Bearer <token>
+                  --> Verify HMAC-SHA256 signature
+                        --> Check exp timestamp
+                              --> Extract user_id from sub claim
 ```
 
 ---
@@ -440,11 +445,11 @@ API Request ──► Authorization: Bearer <token>
 
 | Node | Role | Inputs | Outputs |
 |------|------|--------|---------|
-| **User Query** | Pipeline entry point | User's chat message | `query` string |
-| **Knowledge Base** | RAG retrieval | `query` | `context` (top-5 similar chunks) |
-| **LLM Engine** | Text generation | `query`, `context` (optional) | `response` |
-| **Web Search** | Real-time search | `query` | `formatted_results` |
-| **Output** | Pipeline terminal | Any upstream value | `final_response` to chat |
+| User Query | Pipeline entry point | User's chat message | `query` string |
+| Knowledge Base | RAG retrieval | `query` | `context` (top-5 similar chunks) |
+| LLM Engine | Text generation | `query`, `context` (optional) | `response` |
+| Web Search | Real-time search | `query` | `formatted_results` |
+| Output | Pipeline terminal | Any upstream value | `final_response` to chat |
 
 The Output node selects the best available upstream value in priority order:
 `llm_response` > `web_search_results` > `context` > `query`
@@ -453,13 +458,20 @@ The Output node selects the best available upstream value in priority order:
 
 ## Deployment
 
+See [SETUP.md](SETUP.md) for full instructions covering:
+
+- Docker containerization (Frontend + Backend)
+- Kubernetes manifests for local (minikube) and cloud (AWS EKS, Google GKE) deployment
+- Prometheus + Grafana monitoring setup
+- ELK Stack (Elasticsearch, Logstash, Kibana) log aggregation
+
 The current setup is designed for single-server deployment — SQLite and ChromaDB are embedded and co-located with the backend process.
 
 To scale for production:
 
 | Component | Current | Production Recommendation |
 |-----------|---------|--------------------------|
-| Relational DB | SQLite (`app.db`) | PostgreSQL |
+| Relational DB | SQLite (`app.db`) | PostgreSQL via Supabase or managed RDS |
 | Vector DB | ChromaDB (embedded) | Pinecone, Weaviate, or hosted ChromaDB |
 | Auth | Custom PBKDF2 + JWT | Keep as-is — add refresh token rotation |
 | LLM | Google Gemini | Add OpenAI / Anthropic as additional providers |
@@ -517,9 +529,9 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 - [React Flow](https://reactflow.dev) — workflow canvas
 - [ChromaDB](https://trychroma.com) — vector store
 - [Google Gemini API](https://ai.google.dev/docs) — LLM and embedding provider
-- [Sentence Transformers](https://sbert.net) — local embedding model (`all-MiniLM-L6-v2`)
+- [Sentence Transformers](https://sbert.net) — local embedding model
 - [shadcn/ui](https://ui.shadcn.com) — component library
-- [Lucide React](https://lucide.dev) — icon library
+- [Supabase](https://supabase.com) — database and storage
 - [SerpAPI](https://serpapi.com/documentation) — web search integration
 
 ---
