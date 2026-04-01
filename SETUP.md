@@ -1431,4 +1431,4 @@ project-root/
 
 ---
 
-For questions or issues, open a [GitHub Issue](../../issues).
+For questions or issues, open a [GitHub Issue](../../issues) or reach out at [gmail](praveen.chinna0765@gmail.com).
